@@ -23,10 +23,11 @@ async def main() -> None:
 
     supervisor = Supervisor()
     supervisor.bus = EventBus(
-        per_source_queue_size=100,
-        merged_queue_size=500,
+        per_source_queue_size=10,
+        merged_queue_size=30,
         drop_on_full=True,
         metrics=metrics,
+        enable_per_source_queues=False,
     )
 
     sensor = SensorSource(
@@ -42,9 +43,9 @@ async def main() -> None:
         stop_event=supervisor.stop_event,
         service_name="auth-service",
         host="node-1",
-        base_interval=1.0,
-        burst_interval=0.2,
-        burst_probability=0.2,
+        base_interval=0.2,
+        burst_interval=0.05,
+        burst_probability=0.6,
     )
 
     feed = FeedSource(
