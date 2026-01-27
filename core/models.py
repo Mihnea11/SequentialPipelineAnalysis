@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 import uuid
@@ -40,10 +40,8 @@ class Event:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     source: EventSource = EventSource.FEED
     event_type: EventType = EventType.RAW
-    timestamp: datetime = field(default_factory=datetime.utcnow)
-
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     payload: Dict[str, Any] = field(default_factory=dict)
-
     tags: Dict[str, str] = field(default_factory=dict)
     correlation_id: Optional[str] = None
 
