@@ -2,7 +2,7 @@ import asyncio
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional, Awaitable
 
 from core.models import Event, EventSource
 from metrics.collector import MetricsCollector
@@ -185,12 +185,20 @@ async def run_live_aggregation(
     window_size: timedelta,
     stop_event: asyncio.Event,
     metrics: MetricsCollector | None = None,
+    on_event: Optional[Callable[[Any], None]] = None,
+    on_after_batch: Optional[Callable[[], Awaitable[None]]] = None,
 ) -> None:
     processor = AsyncTumblingWindowProcessor(window_size=window_size)
 
     try:
         while not stop_event.is_set():
             event = await input_queue.get()
+
+            if on_event is not None:
+                try:
+                    on_event(event)
+                except Exception:
+                    pass
 
             if metrics is not None:
                 now = datetime.now(timezone.utc)
@@ -211,6 +219,12 @@ async def run_live_aggregation(
             t0 = time.perf_counter()
             aggs = aggregate_batch(batch)
             t1 = time.perf_counter()
+
+            if on_after_batch is not None:
+                try:
+                    await on_after_batch()
+                except Exception:
+                    pass
 
             for agg in aggs:
                 await output_queue.put(agg)
@@ -235,6 +249,12 @@ async def run_live_aggregation(
             t0 = time.perf_counter()
             aggs = aggregate_batch(last)
             t1 = time.perf_counter()
+
+            if on_after_batch is not None:
+                try:
+                    await on_after_batch()
+                except Exception:
+                    pass
 
             for agg in aggs:
                 await output_queue.put(agg)

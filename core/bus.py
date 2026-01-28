@@ -32,22 +32,27 @@ class EventBus:
     # -------------------------
 
     async def publish(self, event: Event) -> bool:
-        dropped = False
+        dropped_merged = False
+        dropped_source = False
 
-        try:
-            if self.enable_per_source_queues:
+        if self.enable_per_source_queues:
+            try:
                 self._source_queues[event.source].put_nowait(event)
-
-            self._merged_queue.put_nowait(event)
-
-        except asyncio.QueueFull:
-            if not self.drop_on_full:
-                if self.enable_per_source_queues:
+            except asyncio.QueueFull:
+                if self.drop_on_full:
+                    dropped_source = True
+                else:
                     await self._source_queues[event.source].put(event)
 
-                await self._merged_queue.put(event)
+        try:
+            self._merged_queue.put_nowait(event)
+        except asyncio.QueueFull:
+            if self.drop_on_full:
+                dropped_merged = True
             else:
-                dropped = True
+                await self._merged_queue.put(event)
+
+        dropped = dropped_merged or dropped_source
 
         if self.metrics is not None:
             self.metrics.record_ingest(
@@ -56,7 +61,7 @@ class EventBus:
                 queue_sizes=self.queue_sizes(),
             )
 
-        return not dropped
+        return not dropped_merged
 
     # -------------------------
     # CONSUMPTION
